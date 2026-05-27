@@ -1,3 +1,4 @@
+"use client";
 import { useState, useRef, useCallback } from "react";
 
 // ── Design tokens (same palette as the PDF reports) ──────────────────────────
