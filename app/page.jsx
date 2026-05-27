@@ -12,7 +12,7 @@ const C = {
   bwrn: 'rgba(232,201,168,0.18)',
 };
 
-const mono = "'JetBrains Mono', 'Fira Code', monospace";
+const mono = "'JetBrains Mono', 'Fira Code', monosace";
 const serif = "'Playfair Display', Georgia, serif";
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt – kein Text davor oder danach, 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6',
           max_tokens: 2000,
           system: 'Du bist der führende Immobilien-Bewertungsexperte von Nick und Nico Immobilien Berlin. Du erstellst präzise, datenbasierte Preiseinschätzungen für Eigentumswohnungen in Berlin auf Basis aller bereitgestellten Unterlagen und aktueller Marktdaten (Guthmann, ImmoScout, BORIS). Antworte immer NUR mit reinem JSON, niemals mit Markdown-Blöcken oder erklärendem Text.',
           messages: [{ role: 'user', content: buildContent(files) }],
