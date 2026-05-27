@@ -50,7 +50,7 @@ function FileRow({ file, onRemove }) {
   const isImg = file.type.startsWith('image/');
   const icon = isPdf ? '📄' : isImg ? '🖼' : '📎';
   const kb = (file.size / 1024).toFixed(0);
-  const tooBig = file.size > 20 * 1024 * 1024; // 20 MB warning
+  const tooBig = file.type === "application/pdf" && file.size > 4 * 1024 * 1024; // 4 MB warning for PDFs
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
@@ -63,7 +63,9 @@ function FileRow({ file, onRemove }) {
         {file.name}
       </span>
       <span style={{ fontFamily: mono, fontSize: 11, color: tooBig ? C.neg : C.txm }}>
-        {kb > 1024 ? (kb/1024).toFixed(1)+' MB' : kb+' KB'}
+        {file.originalSize
+          ? `${(file.originalSize/1024/1024).toFixed(1)} MB → ${kb > 1024 ? (kb/1024).toFixed(1)+' MB' : kb+' KB'} ✓`
+          : kb > 1024 ? (kb/1024).toFixed(1)+' MB' : kb+' KB'}
         {tooBig && ' ⚠'}
       </span>
       <button onClick={onRemove} style={{
@@ -114,12 +116,45 @@ export default function App() {
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
 
-  // Process file → base64
-  const readFile = (f) => new Promise((resolve) => {
-    const r = new FileReader();
-    r.onload = (e) => resolve({ name: f.name, type: f.type, size: f.size, data: e.target.result.split(',')[1] });
-    r.readAsDataURL(f);
+  // Compress image via Canvas before base64 encoding
+  const compressImage = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1400;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url);
+        const r = new FileReader();
+        r.onload = (e) => resolve({
+          name: file.name.replace(/\.[^.]+$/, '.jpg'),
+          type: 'image/jpeg',
+          size: blob.size,
+          originalSize: file.size,
+          data: e.target.result.split(',')[1],
+        });
+        r.readAsDataURL(blob);
+      }, 'image/jpeg', 0.80);
+    };
+    img.src = url;
   });
+
+  // Process file → base64 (images get compressed, PDFs stay as-is)
+  const readFile = (f) => {
+    if (f.type.startsWith('image/')) return compressImage(f);
+    return new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = (e) => resolve({ name: f.name, type: f.type, size: f.size, data: e.target.result.split(',')[1] });
+      r.readAsDataURL(f);
+    });
+  };
 
   const addFiles = useCallback(async (list) => {
     const processed = await Promise.all(Array.from(list).map(readFile));
@@ -293,6 +328,18 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt – kein Text davor oder danach, 
                   Ohne Unterlagen ist die Einschätzung nur indikativ (Konfidenz ●●○○○)
                 </div>
               )}
+              {files.length > 0 && (() => {
+                const total = files.reduce((s, f) => s + f.size, 0);
+                const totalMB = (total / 1024 / 1024).toFixed(1);
+                const overLimit = total > 10 * 1024 * 1024;
+                return (
+                  <div style={{ fontFamily: mono, fontSize: 11, color: overLimit ? C.neg : C.txm, padding: '6px 0' }}>
+                    {overLimit
+                      ? `⚠ Gesamt ${totalMB} MB — zu groß (max. ~10 MB). PDFs komprimieren oder weniger hochladen.`
+                      : `Gesamt: ${totalMB} MB ✓`}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Notes */}
